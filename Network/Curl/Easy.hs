@@ -38,11 +38,13 @@ import Network.Curl.Debug
 
 import Data.IORef(IORef)
 import Foreign.Ptr
-import Foreign.Marshal.Alloc(free)
+import Foreign.Marshal.Alloc(mallocBytes, free)
+import Foreign.Marshal.Utils(copyBytes)
 import Foreign.C.Types
 import Foreign.C.String
 import Control.Monad
 import Data.Maybe
+import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
 
 -- | Initialise a curl instance
 initialize :: IO Curl
@@ -88,6 +90,16 @@ setopt hh o = curlPrim hh $ \ r h -> unmarshallOption (easy_um r h) o
               updateCleanup r i $
                 debug ("FREE: " ++ show x) >> curl_slist_free ip
               liftM toCode $ easy_setopt_string h i (castPtr ip)
+
+    , u_bytestring  -- :: Int -> B.ByteString   -> IO CurlCode
+       = \ i x -> do
+           debug $ "ALLOC: " ++ show x
+           unsafeUseAsCStringLen x $ \(cstr, len) -> do
+               c_x <- mallocBytes len
+               copyBytes c_x cstr len
+               updateCleanup r i $ debug ("FREE: "++ show x) >> free c_x
+               liftM toCode $ easy_setopt_ptr h i c_x
+
      , u_ptr    -- :: Int -> Ptr ()   -> IO a
        = \ i x -> liftM toCode $ easy_setopt_ptr h i x
      , u_writeFun -- :: Int -> WriteFunction -> IO a

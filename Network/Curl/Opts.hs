@@ -16,6 +16,8 @@ module Network.Curl.Opts where
 import Network.Curl.Types
 import Network.Curl.Post
 import Data.List
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as B8
 
 import Foreign.Ptr
 import Foreign.C.Types
@@ -36,6 +38,7 @@ data CurlOption
  | CurlTimeout Long{-secs-}        -- ^ number of seconds before timing out curl operation\/request.
  | CurlInFileSize Long{-bytes-}    -- ^ expected size of uploaded data.
  | CurlPostFields [String]         -- ^ (Multipart) POST data.
+ | CurlPostFieldsBS [B.ByteString] -- ^ (Multipart) POST data.
  | CurlReferer String              -- ^ Set the Referer: header to the given string.
  | CurlFtpPort String              -- ^ The string to feed to the FTP PORT command.
  | CurlUserAgent String            -- ^ Set the User-Agent: header to the given string.
@@ -354,6 +357,7 @@ unmarshallOption um c =
   CurlTimeout x ->  u_long um (l 13) x
   CurlInFileSize x -> u_long um (l 14) x
   CurlPostFields x -> u_string um (o 15) (concat $ intersperse "&" x)
+  CurlPostFieldsBS x -> u_bytestring um (o 15) (B.concat $ intersperse (B8.pack "&") x)
   CurlReferer x ->  u_string um (o 16) x
   CurlFtpPort x ->  u_string um (o 17) x
   CurlUserAgent x -> u_string um (o 18) x
@@ -502,6 +506,7 @@ data Unmarshaller a
      , u_llong   :: Int -> LLong    -> IO a
      , u_string  :: Int -> String   -> IO a
      , u_strings :: Int -> [String] -> IO a
+     , u_bytestring :: Int -> B.ByteString -> IO a
      , u_ptr     :: Int -> Ptr ()   -> IO a
      , u_writeFun :: Int -> WriteFunction -> IO a
      , u_readFun :: Int -> ReadFunction -> IO a
@@ -525,6 +530,7 @@ verboseUnmarshaller u =
     , u_llong       = twoS "u_llong" u_llong
     , u_string      = twoS "u_string" u_string 
     , u_strings     = twoS "u_strings" u_strings
+    , u_bytestring  = twoS "u_bytestring" u_bytestring
     , u_ptr         = twoS "u_ptr" u_ptr
     , u_writeFun    = two "u_writeFun" u_writeFun
     , u_readFun     = two "u_readFun" u_readFun
@@ -566,6 +572,7 @@ showCurlOption o =
     CurlTimeout l       -> "CurlTimeout " ++ show l
     CurlInFileSize l    -> "CurlInFileSize " ++ show l
     CurlPostFields p    -> "CurlPostFields " ++ show p
+    CurlPostFieldsBS p  -> "CurlPostFieldsBS " ++ show p
     CurlReferer p       -> "CurlReferer " ++ show p
     CurlFtpPort p       -> "CurlFtpPort " ++ show p
     CurlUserAgent p     -> "CurlUserAgent " ++ show p
